@@ -24,6 +24,7 @@ var testList []testFunc = []testFunc{
 	test2,
 	test3,
 	test4,
+	test5,
 }
 
 func runTests(ctx context.Context, l *slog.Logger, to TestOptions) error {
