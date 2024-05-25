@@ -30,12 +30,12 @@ var (
 func main() {
 	fs := ff.NewFlagSet(appName)
 	var (
-		v4       = fs.BoolShort('4', "only resolve IPv4 (only works when manual is not set)")
-		v6       = fs.BoolShort('6', "only resolve IPv6 (only works when manual is not set)")
-		sni      = fs.String('e', "sni", "", "tls sni (if manual not set, this will be resolved)")
-		port     = fs.Uint('p', "port", 443, "tls port")
-		manual   = fs.String('m', "manual", "", "manually provide IP (no DNS lookup)")
-		logLevel = fs.StringEnumLong("loglevel", "specify a log level", logLevels...)
+		v4       = fs.BoolShort('4', "only resolve IPv4 (only works when IP is not set)")
+		v6       = fs.BoolShort('6', "only resolve IPv6 (only works when IP is not set)")
+		sni      = fs.StringLong("sni", "", "tls sni (if IP flag not provided, this SNI will be resolved by system DNS)")
+		port     = fs.UintLong("port", 443, "tls port")
+		ip       = fs.StringLong("ip", "", "manually provide IP (no DNS lookup)")
+		logLevel = fs.StringEnumLong("loglevel", fmt.Sprintf("specify a log level (valid values: %s)", logLevels), logLevels...)
 		logJson  = fs.Bool('j', "json", "log in json format")
 		verFlag  = fs.BoolLong("version", "displays version number")
 	)
@@ -89,11 +89,11 @@ func main() {
 	}
 
 	addr := netip.IPv4Unspecified()
-	if *manual != "" {
+	if *ip != "" {
 		if *v4 || *v6 {
-			fatal(l, errors.New("cannot set manual and -4 or -6"))
+			fatal(l, errors.New("cannot set ip and -4 or -6"))
 		}
-		addr, err = netip.ParseAddr(*manual)
+		addr, err = netip.ParseAddr(*ip)
 		if err != nil {
 			fatal(l, err)
 		}
