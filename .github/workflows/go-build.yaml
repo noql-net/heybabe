@@ -1,0 +1,71 @@
+name: Go
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+
+          - goos: android
+            goarch: arm64
+          - goos: android
+            goarch: arm
+            goarm: 7
+
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: linux
+            goarch: arm
+            goarm: 7
+
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+
+    runs-on: ubuntu-latest
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+      GOARM: ${{ matrix.goarm }}
+      CGO_ENABLED: 0
+    steps:
+      - name: Checkout codebase
+        uses: actions/checkout@v4
+
+      - name: Show workflow information
+        run: |
+          export _NAME=$GOOS-$GOARCH$GOARM$GOMIPS
+          echo "GOOS: $GOOS, GOARCH: $GOARCH, GOARM: $GOARM, GOMIPS: $GOMIPS, RELEASE_NAME: $_NAME"
+          echo "ASSET_NAME=$_NAME" >> $GITHUB_ENV
+          echo "REF=${GITHUB_SHA::6}" >> $GITHUB_ENV
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          check-latest: true
+
+      - name: Build heybabe
+        run: |
+          go build -v -o bin/heybabe_${{ env.ASSET_NAME }} -trimpath -ldflags "-s -w -buildid= -X main.version=${{ github.ref }}" .
+
+      - name: Upload files to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: heybabe_${{ env.ASSET_NAME }}_${{ env.REF }}
+          path: ./bin/heybabe_${{ env.ASSET_NAME }}
+
