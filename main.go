@@ -35,6 +35,7 @@ func main() {
 		sni      = fs.StringLong("sni", "", "tls sni (if IP flag not provided, this SNI will be resolved by system DNS)")
 		port     = fs.UintLong("port", 443, "tls port")
 		ip       = fs.StringLong("ip", "", "manually provide IP (no DNS lookup)")
+		repeat   = fs.UintLong("repeat", 1, "number of times to repeat each test")
 		logLevel = fs.StringEnumLong("loglevel", fmt.Sprintf("specify a log level (valid values: %s)", logLevels), logLevels...)
 		logJson  = fs.Bool('j', "json", "log in json format")
 		verFlag  = fs.BoolLong("version", "displays version number")
@@ -113,6 +114,7 @@ func main() {
 			ManualIP:    addr.Unmap(),
 			Port:        uint16(*port),
 			SNI:         *sni,
+			Repeat:      *repeat,
 		}
 
 		if err := runTests(ctx, l, to); err != nil {

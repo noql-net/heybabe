@@ -6,7 +6,13 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
+	"reflect"
+	"runtime"
+	"strings"
 	"time"
+
+	"github.com/fatih/color"
+	"github.com/rodaine/table"
 )
 
 type TestOptions struct {
@@ -15,9 +21,16 @@ type TestOptions struct {
 	ManualIP    netip.Addr
 	Port        uint16
 	SNI         string
+	Repeat      uint
 }
 
-type testFunc func(context.Context, *slog.Logger, netip.AddrPort, string)
+type TestResult struct {
+	AddrPort netip.AddrPort
+	SNI      string
+	Attempts []error
+}
+
+type testFunc func(context.Context, *slog.Logger, netip.AddrPort, string) error
 
 var testList []testFunc = []testFunc{
 	test1,
@@ -30,36 +43,58 @@ var testList []testFunc = []testFunc{
 func runTests(ctx context.Context, l *slog.Logger, to TestOptions) error {
 	l = l.With("sni", to.SNI, "port", to.Port)
 
-	v4, v6 := netip.IPv4Unspecified(), netip.IPv6Unspecified()
+	testAddrPorts := []netip.AddrPort{}
 	if to.ManualIP == netip.IPv4Unspecified() {
 		l.Debug("manual IP not specified, attempting DNS resolution")
 
 		// Resolve DNS
 		var err error
-		v4, v6, err = resolve(ctx, to.SNI, to.ResolveIPv4, to.ResolveIPv6)
+		v4, v6, err := resolve(ctx, to.SNI, to.ResolveIPv4, to.ResolveIPv6)
 		if err != nil {
 			return fmt.Errorf("failed to resolve SNI: %w", err)
 		}
-	}
 
-	for _, test := range testList {
-		if to.ManualIP != netip.IPv4Unspecified() {
-			test(ctx, l, netip.AddrPortFrom(to.ManualIP, to.Port), to.SNI)
-			time.Sleep(1 * time.Second)
-			continue
-		}
-
-		// If the IP is not manually provided (therefore unspecified),
-		// use the resolved IPs but limit tests to only the user
-		// specified address families.
 		if to.ResolveIPv4 && v4 != netip.IPv4Unspecified() {
-			test(ctx, l, netip.AddrPortFrom(v4, to.Port), to.SNI)
+			testAddrPorts = append(testAddrPorts, netip.AddrPortFrom(v4, to.Port))
 		}
+
 		if to.ResolveIPv6 && v6 != netip.IPv6Unspecified() {
-			test(ctx, l, netip.AddrPortFrom(v6, to.Port), to.SNI)
+			testAddrPorts = append(testAddrPorts, netip.AddrPortFrom(v6, to.Port))
 		}
-		time.Sleep(1 * time.Second)
+	} else {
+		testAddrPorts = append(testAddrPorts, netip.AddrPortFrom(to.ManualIP, to.Port))
 	}
+
+	results := make(map[string][]TestResult)
+	for _, test := range testList {
+		resultsPerTest := make([]TestResult, len(testAddrPorts))
+		for x, addrPort := range testAddrPorts {
+			tr := TestResult{AddrPort: addrPort, SNI: to.SNI, Attempts: make([]error, to.Repeat)}
+			for i := uint(0); i < to.Repeat; i++ {
+				tr.Attempts[i] = test(ctx, l, addrPort, to.SNI)
+				time.Sleep(1 * time.Second)
+			}
+			resultsPerTest[x] = tr
+		}
+		results[GetFunctionName(test)] = resultsPerTest
+	}
+
+	headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
+	columnFmt := color.New(color.FgYellow).SprintfFunc()
+
+	tbl := table.New("Test", "SNI", "AddressPort", "Success")
+	tbl.WithHeaderFormatter(headerFmt).WithFirstColumnFormatter(columnFmt)
+
+	for testName, testResults := range results {
+		for _, testResult := range testResults {
+			for i, attempt := range testResult.Attempts {
+				tbl.AddRow(fmt.Sprintf("%s - %d", testName, i+1), testResult.SNI, testResult.AddrPort, attempt == nil)
+			}
+			tbl.AddRow()
+		}
+	}
+
+	tbl.Print()
 
 	return nil
 }
@@ -103,4 +138,9 @@ func resolve(ctx context.Context, hostname string, getv4, getv6 bool) (v4, v6 ne
 	}
 
 	return v4, v6, nil
+}
+
+func GetFunctionName(temp interface{}) string {
+	strs := strings.Split((runtime.FuncForPC(reflect.ValueOf(temp).Pointer()).Name()), ".")
+	return strs[len(strs)-1]
 }

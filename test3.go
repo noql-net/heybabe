@@ -14,7 +14,7 @@ import (
 // test3 is a uTLS connection using:
 // warp-plus settings from from warp-plus v1.2.1
 // NOTE: the version of uTLS used in warp-plus is much older than here.
-func test3(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string) {
+func test3(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string) error {
 	l = l.With("test", "test3", "ip", addrPort.Addr().String())
 	// Initiate TCP connection
 	tcpDialer := net.Dialer{
@@ -29,7 +29,7 @@ func test3(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni str
 	tcpConn, err := tcpDialer.DialContext(ctx, "tcp", addrPort.String())
 	if err != nil {
 		l.Error(err.Error())
-		return
+		return err
 	}
 	defer tcpConn.Close()
 
@@ -94,17 +94,18 @@ func test3(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni str
 	}
 	if err := tlsConn.ApplyPreset(&spec); err != nil {
 		l.Error(err.Error())
-		return
+		return err
 	}
 
 	// Explicitly run the handshake
 	if err := tlsConn.HandshakeContext(ctx); err != nil {
 		l.Error(err.Error())
-		return
+		return err
 	}
 
 	tlsState := tlsConn.ConnectionState()
 	l.Info("success", "handshake", tlsState.HandshakeComplete)
+	return nil
 }
 
 // Weird extension added in warp-plus that I don't understand (I think

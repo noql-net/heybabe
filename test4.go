@@ -16,7 +16,7 @@ import (
 // forced TLS1.3
 // default elliptic curve preferences
 // utls.HelloChrome_Auto
-func test4(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string) {
+func test4(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string) error {
 	l = l.With("test", "test4", "ip", addrPort.Addr().String())
 	// Initiate TCP connection
 	tcpDialer := net.Dialer{
@@ -31,7 +31,7 @@ func test4(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni str
 	tcpConn, err := tcpDialer.DialContext(ctx, "tcp", addrPort.String())
 	if err != nil {
 		l.Error(err.Error())
-		return
+		return err
 	}
 	defer tcpConn.Close()
 
@@ -50,9 +50,10 @@ func test4(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni str
 	// Explicitly run the handshake
 	if err := tlsConn.HandshakeContext(ctx); err != nil {
 		l.Error(err.Error())
-		return
+		return err
 	}
 
 	tlsState := tlsConn.ConnectionState()
 	l.Info("success", "handshake", tlsState.HandshakeComplete)
+	return nil
 }

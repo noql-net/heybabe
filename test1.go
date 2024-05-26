@@ -17,7 +17,7 @@ import (
 // default cipher suites
 // forced TLS1.2
 // default elliptic curve preferences
-func test1(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string) {
+func test1(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string) error {
 	l = l.With("test", "test1", "ip", addrPort.Addr().String())
 	// Initiate TCP connection
 	tcpDialer := net.Dialer{
@@ -32,7 +32,7 @@ func test1(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni str
 	tcpConn, err := tcpDialer.DialContext(ctx, "tcp", addrPort.String())
 	if err != nil {
 		l.Error(err.Error())
-		return
+		return err
 	}
 	defer tcpConn.Close()
 
@@ -51,9 +51,10 @@ func test1(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni str
 	// Explicitly run the handshake
 	if err := tlsConn.HandshakeContext(ctx); err != nil {
 		l.Error(err.Error())
-		return
+		return err
 	}
 
 	tlsState := tlsConn.ConnectionState()
 	l.Info("success", "handshake", tlsState.HandshakeComplete)
+	return nil
 }
