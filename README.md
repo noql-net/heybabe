@@ -18,6 +18,11 @@ To specify a non-default port:
 $ heybabe --sni twitter.com --port 8443
 ```
 
+To repeat a test multiple times:
+```sh
+$ heybabe --sni twitter.com --repeat 2
+```
+
 ### Usage
 ```
 NAME
@@ -29,7 +34,8 @@ FLAGS
       --sni STRING        tls sni (if IP flag not provided, this SNI will be resolved by system DNS)
       --port UINT         tls port (default: 443)
       --ip STRING         manually provide IP (no DNS lookup)
-      --loglevel STRING   specify a log level (default: DEBUG)
+      --repeat UINT       number of times to repeat each test (default: 1)
+      --loglevel STRING   specify a log level (valid values: [DEBUG INFO WARN ERROR]) (default: DEBUG)
   -j, --json              log in json format
       --version           displays version number
 ```
