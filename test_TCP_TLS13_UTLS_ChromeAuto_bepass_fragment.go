@@ -5,21 +5,30 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
+	"runtime"
+	"strings"
 	"time"
+
+	// This is for systems that don't have a good set of roots. (update often)
+	_ "golang.org/x/crypto/x509roots/fallback"
 
 	"github.com/markpash/heybabe/bepass/tlsfrag"
 	tls "github.com/refraction-networking/utls"
 )
 
-// test5 is a uTLS connection using:
+// test_TCP_TLS13_UTLS_ChromeAuto_bepass_fragment is a uTLS connection using:
 // TCP
 // default cipher suites
 // forced TLS1.3
 // default elliptic curve preferences
 // utls.HelloChrome_Auto
 // And the bepass fragmenting TCP connection!
-func test5(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string) error {
-	l = l.With("test", "test5", "ip", addrPort.Addr().String())
+func test_TCP_TLS13_UTLS_ChromeAuto_bepass_fragment(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string) TestAttemptResult {
+	counter, _, _, _ := runtime.Caller(0)
+	l = l.With("test", strings.Split(runtime.FuncForPC(counter).Name(), ".")[1], "ip", addrPort.Addr().String())
+
+	res := TestAttemptResult{}
+
 	// Initiate TCP connection
 	tcpDialer := net.Dialer{
 		Timeout:       5 * time.Second,
@@ -30,12 +39,15 @@ func test5(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni str
 	}
 	tcpDialer.SetMultipathTCP(false)
 
+	t0 := time.Now()
 	tcpConn, err := tcpDialer.DialContext(ctx, "tcp", addrPort.String())
 	if err != nil {
 		l.Error(err.Error())
-		return err
+		res.err = err
+		return res
 	}
 	defer tcpConn.Close()
+	res.TransportEstablishDuration = time.Since(t0)
 
 	// bepass frag settings
 	bsl := [2]int{2000, 2000} // ChunksLengthBeforeSni
@@ -58,12 +70,15 @@ func test5(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni str
 	defer tlsConn.Close()
 
 	// Explicitly run the handshake
+	t0 = time.Now()
 	if err := tlsConn.HandshakeContext(ctx); err != nil {
 		l.Error(err.Error())
-		return err
+		res.err = err
+		return res
 	}
+	res.TLSHandshakeDuration = time.Since(t0)
 
 	tlsState := tlsConn.ConnectionState()
 	l.Info("success", "handshake", tlsState.HandshakeComplete)
-	return nil
+	return res
 }

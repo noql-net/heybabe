@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"reflect"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -27,17 +28,23 @@ type TestOptions struct {
 type TestResult struct {
 	AddrPort netip.AddrPort
 	SNI      string
-	Attempts []error
+	Attempts []TestAttemptResult
 }
 
-type testFunc func(context.Context, *slog.Logger, netip.AddrPort, string) error
+type TestAttemptResult struct {
+	TransportEstablishDuration time.Duration
+	TLSHandshakeDuration       time.Duration
+	err                        error
+}
 
-var testList []testFunc = []testFunc{
-	test1,
-	test2,
-	test3,
-	test4,
-	test5,
+type testFunc func(context.Context, *slog.Logger, netip.AddrPort, string) TestAttemptResult
+
+var testList map[string]testFunc = map[string]testFunc{
+	GetFunctionName(test_TCP_TLS12_Default):                         test_TCP_TLS12_Default,
+	GetFunctionName(test_TCP_TLS13_Default):                         test_TCP_TLS13_Default,
+	GetFunctionName(test_TCP_TLS_warp_plus_custom):                  test_TCP_TLS_warp_plus_custom,
+	GetFunctionName(test_TCP_TLS13_UTLS_ChromeAuto_Default):         test_TCP_TLS13_UTLS_ChromeAuto_Default,
+	GetFunctionName(test_TCP_TLS13_UTLS_ChromeAuto_bepass_fragment): test_TCP_TLS13_UTLS_ChromeAuto_bepass_fragment,
 }
 
 func runTests(ctx context.Context, l *slog.Logger, to TestOptions) error {
@@ -66,37 +73,55 @@ func runTests(ctx context.Context, l *slog.Logger, to TestOptions) error {
 	}
 
 	results := make(map[string][]TestResult)
-	for _, test := range testList {
+	for name, test := range testList {
 		resultsPerTest := make([]TestResult, len(testAddrPorts))
 		for x, addrPort := range testAddrPorts {
-			tr := TestResult{AddrPort: addrPort, SNI: to.SNI, Attempts: make([]error, to.Repeat)}
+			tr := TestResult{AddrPort: addrPort, SNI: to.SNI, Attempts: make([]TestAttemptResult, to.Repeat)}
 			for i := uint(0); i < to.Repeat; i++ {
 				tr.Attempts[i] = test(ctx, l, addrPort, to.SNI)
 				time.Sleep(1 * time.Second)
 			}
 			resultsPerTest[x] = tr
 		}
-		results[GetFunctionName(test)] = resultsPerTest
+		results[name] = resultsPerTest
 	}
 
+	printTable(results)
+
+	return nil
+}
+
+func printTable(results map[string][]TestResult) {
 	headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
 	columnFmt := color.New(color.FgYellow).SprintfFunc()
 
-	tbl := table.New("Test", "SNI", "AddressPort", "Success")
+	tbl := table.New("Test", "SNI", "AddressPort", "Success", "TransportEstablishTime", "TLSHandshakeTime")
 	tbl.WithHeaderFormatter(headerFmt).WithFirstColumnFormatter(columnFmt)
 
-	for testName, testResults := range results {
+	keys := make([]string, 0, len(results))
+	for k := range results {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, testName := range keys {
+		testResults := results[testName]
 		for _, testResult := range testResults {
 			for i, attempt := range testResult.Attempts {
-				tbl.AddRow(fmt.Sprintf("%s - %d", testName, i+1), testResult.SNI, testResult.AddrPort, attempt == nil)
+				tbl.AddRow(
+					fmt.Sprintf("%s - %d", testName, i+1),
+					testResult.SNI,
+					testResult.AddrPort,
+					attempt.err == nil,
+					attempt.TransportEstablishDuration,
+					attempt.TLSHandshakeDuration,
+				)
 			}
 			tbl.AddRow()
 		}
 	}
 
 	tbl.Print()
-
-	return nil
 }
 
 func resolve(ctx context.Context, hostname string, getv4, getv6 bool) (v4, v6 netip.Addr, err error) {

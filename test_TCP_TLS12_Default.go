@@ -2,22 +2,29 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"log/slog"
 	"net"
 	"net/netip"
+	"runtime"
+	"strings"
 	"time"
 
-	tls "github.com/refraction-networking/utls"
+	// This is for systems that don't have a good set of roots. (update often)
+	_ "golang.org/x/crypto/x509roots/fallback"
 )
 
-// test4 is a uTLS connection using:
+// test_TCP_TLS12_Default is a go crypto/tls connection using:
 // TCP
 // default cipher suites
-// forced TLS1.3
+// forced TLS1.2
 // default elliptic curve preferences
-// utls.HelloChrome_Auto
-func test4(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string) error {
-	l = l.With("test", "test4", "ip", addrPort.Addr().String())
+func test_TCP_TLS12_Default(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string) TestAttemptResult {
+	counter, _, _, _ := runtime.Caller(0)
+	l = l.With("test", strings.Split(runtime.FuncForPC(counter).Name(), ".")[1], "ip", addrPort.Addr().String())
+
+	res := TestAttemptResult{}
+
 	// Initiate TCP connection
 	tcpDialer := net.Dialer{
 		Timeout:       5 * time.Second,
@@ -28,32 +35,38 @@ func test4(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni str
 	}
 	tcpDialer.SetMultipathTCP(false)
 
+	t0 := time.Now()
 	tcpConn, err := tcpDialer.DialContext(ctx, "tcp", addrPort.String())
 	if err != nil {
 		l.Error(err.Error())
-		return err
+		res.err = err
+		return res
 	}
 	defer tcpConn.Close()
+	res.TransportEstablishDuration = time.Since(t0)
 
 	tlsConfig := tls.Config{
 		ServerName:         sni,
 		InsecureSkipVerify: false,
 		CipherSuites:       nil,
-		MinVersion:         tls.VersionTLS13,
-		MaxVersion:         tls.VersionTLS13,
+		MinVersion:         tls.VersionTLS12,
+		MaxVersion:         tls.VersionTLS12,
 		CurvePreferences:   nil,
 	}
 
-	tlsConn := tls.UClient(tcpConn, &tlsConfig, tls.HelloChrome_Auto)
+	tlsConn := tls.Client(tcpConn, &tlsConfig)
 	defer tlsConn.Close()
 
 	// Explicitly run the handshake
+	t0 = time.Now()
 	if err := tlsConn.HandshakeContext(ctx); err != nil {
 		l.Error(err.Error())
-		return err
+		res.err = err
+		return res
 	}
+	res.TLSHandshakeDuration = time.Since(t0)
 
 	tlsState := tlsConn.ConnectionState()
 	l.Info("success", "handshake", tlsState.HandshakeComplete)
-	return nil
+	return res
 }
