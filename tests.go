@@ -45,6 +45,7 @@ var testList map[string]testFunc = map[string]testFunc{
 	GetFunctionName(test_TCP_TLS_warp_plus_custom):                  test_TCP_TLS_warp_plus_custom,
 	GetFunctionName(test_TCP_TLS13_UTLS_ChromeAuto_Default):         test_TCP_TLS13_UTLS_ChromeAuto_Default,
 	GetFunctionName(test_TCP_TLS13_UTLS_ChromeAuto_bepass_fragment): test_TCP_TLS13_UTLS_ChromeAuto_bepass_fragment,
+	GetFunctionName(test_QUIC_TLS13_UQUIC_Chrome_115_Default):       test_QUIC_TLS13_UQUIC_Chrome_115_Default,
 }
 
 func runTests(ctx context.Context, l *slog.Logger, to TestOptions) error {
