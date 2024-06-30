@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/carlmjohnson/versioninfo"
 	"github.com/peterbourgon/ff/v4"
@@ -38,6 +39,7 @@ func main() {
 		repeat   = fs.UintLong("repeat", 1, "number of times to repeat each test")
 		logLevel = fs.StringEnumLong("loglevel", fmt.Sprintf("specify a log level (valid values: %s)", logLevels), logLevels...)
 		logJson  = fs.Bool('j', "json", "log in json format")
+		timeout  = fs.DurationLong("timeout", 30*time.Second, "timeout for all tests combined")
 		verFlag  = fs.BoolLong("version", "displays version number")
 	)
 
@@ -104,7 +106,11 @@ func main() {
 		*v4, *v6 = true, true
 	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	// create a parent context with a timeout
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), *timeout)
+	defer cancel()
+
+	ctx, cancel := signal.NotifyContext(timeoutCtx, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		defer cancel()
 
