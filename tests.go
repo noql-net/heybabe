@@ -70,6 +70,7 @@ func runTests(ctx context.Context, l *slog.Logger, to TestOptions) error {
 			testAddrPorts = append(testAddrPorts, netip.AddrPortFrom(v6, to.Port))
 		}
 	} else {
+		l.Debug("manual IP specified, proceeding with the provided IP")
 		testAddrPorts = append(testAddrPorts, netip.AddrPortFrom(to.ManualIP, to.Port))
 	}
 
