@@ -80,7 +80,10 @@ func runTests(ctx context.Context, l *slog.Logger, to TestOptions) error {
 		for x, addrPort := range testAddrPorts {
 			tr := TestResult{AddrPort: addrPort, SNI: to.SNI, Attempts: make([]TestAttemptResult, to.Repeat)}
 			for i := uint(0); i < to.Repeat; i++ {
-				tr.Attempts[i] = test(ctx, l, addrPort, to.SNI)
+				// Create a context with 10-second timeout for each individual test
+				testCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+				tr.Attempts[i] = test(testCtx, l, addrPort, to.SNI)
+				cancel() // Always cancel to release resources
 				time.Sleep(1 * time.Second)
 			}
 			resultsPerTest[x] = tr
