@@ -1,4 +1,4 @@
-name: Go
+name: Release Build
 
 on:
   workflow_dispatch:
@@ -50,19 +50,38 @@ jobs:
           echo "ASSET_NAME=$_NAME" >> $GITHUB_ENV
           echo "REF=${GITHUB_SHA::6}" >> $GITHUB_ENV
 
+      - name: Extract version from main.go
+        id: version
+        run: |
+          VERSION=$(grep -E 'var[[:space:]]+version[[:space:]]*=' main.go | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "Detected version: $VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Create git tag if needed
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.name "github-actions"
+          git config --local user.email "github-actions@users.noreply.github.com"
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "Tag v${VERSION} already exists"
+          else
+            git tag -a "v${VERSION}" -m "v${VERSION}"
+            git push origin "v${VERSION}"
+          fi
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
           check-latest: true
 
       - name: Build heybabe
         run: |
-          go build -v -o bin/heybabe_${{ env.ASSET_NAME }} -trimpath -ldflags "-s -w -buildid= -X main.version=${{ github.ref }}" .
+          go build -v -o bin/heybabe_${{ env.ASSET_NAME }} -trimpath -ldflags "-s -w -buildid= -X main.version=${VERSION}" .
 
       - name: Upload files to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: heybabe_${{ env.ASSET_NAME }}_${{ env.REF }}
+          name: heybabe_${{ env.ASSET_NAME }}_v${{ env.VERSION }}
           path: ./bin/heybabe_${{ env.ASSET_NAME }}
 
