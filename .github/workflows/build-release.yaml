@@ -94,6 +94,9 @@ jobs:
           name: heybabe_${{ env.ASSET_NAME }}_${{ env.REF }}
           path: ./bin/heybabe_${{ env.ASSET_NAME }}
 
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
   release:
     name: Publish Release
     needs: build
@@ -107,7 +110,7 @@ jobs:
           path: ./dist
 
       - name: Create / Update GitHub Release and upload binaries
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.build.outputs.version }}
           name: v${{ needs.build.outputs.version }}
@@ -117,7 +120,4 @@ jobs:
             dist/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    outputs:
-      version: ${{ steps.version.outputs.version }}
 
