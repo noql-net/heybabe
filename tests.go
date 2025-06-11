@@ -38,13 +38,13 @@ type TestAttemptResult struct {
 
 type testFunc func(context.Context, *slog.Logger, netip.AddrPort, string) TestAttemptResult
 
-// testCase represents a single test function and its human-readable label.
+// Represents a single test function and its label.
 type testCase struct {
 	fn    testFunc
 	label string
 }
 
-// testSuite holds all tests in the exact order we want to execute and display.
+// Holds all tests in the exact order we want to execute and display.
 var testSuite = []testCase{
 	{fn: test_TCP_TLS12_Default, label: "Default - TCP - TLS 1.2"},
 	{fn: test_TCP_TLS13_Default, label: "Default - TCP - TLS 1.3"},
