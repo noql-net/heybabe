@@ -118,16 +118,45 @@ func printTable(results map[string][]TestResult, order []string) {
 	for _, testName := range order {
 		testResults := results[testName]
 		for _, testResult := range testResults {
-			for i, attempt := range testResult.Attempts {
-				tbl.AddRow(
-					fmt.Sprintf("%s - %d", testName, i+1),
-					testResult.SNI,
-					testResult.AddrPort,
-					attempt.err == nil,
-					attempt.TransportEstablishDuration,
-					attempt.TLSHandshakeDuration,
-				)
+			var (
+				successCount   int
+				totalTransport time.Duration
+				totalTLS       time.Duration
+			)
+
+			for _, attempt := range testResult.Attempts {
+				if attempt.err == nil {
+					successCount++
+					totalTransport += attempt.TransportEstablishDuration
+					totalTLS += attempt.TLSHandshakeDuration
+				}
 			}
+
+			totalAttempts := len(testResult.Attempts)
+			var status string
+			switch {
+			case successCount == 0:
+				status = fmt.Sprintf("Failed  (%d/%d)", successCount, totalAttempts)
+			case successCount == totalAttempts:
+				status = fmt.Sprintf("Success (%d/%d)", successCount, totalAttempts)
+			default:
+				status = fmt.Sprintf("Partial (%d/%d)", successCount, totalAttempts)
+			}
+
+			var avgTransport, avgTLS time.Duration
+			if successCount > 0 {
+				avgTransport = totalTransport / time.Duration(successCount)
+				avgTLS = totalTLS / time.Duration(successCount)
+			}
+
+			tbl.AddRow(
+				testName,
+				testResult.SNI,
+				testResult.AddrPort,
+				status,
+				avgTransport,
+				avgTLS,
+			)
 		}
 	}
 
