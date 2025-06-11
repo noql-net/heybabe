@@ -112,7 +112,7 @@ func printTable(results map[string][]TestResult, order []string) {
 	headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
 	columnFmt := color.New(color.FgYellow).SprintfFunc()
 
-	tbl := table.New("Test", "SNI", "AddressPort", "Success", "TransportEstablishTime", "TLSHandshakeTime")
+	tbl := table.New("Test Method", "SNI", "IP:Port", "Handshake Status", "Transport Time", "TLS Handshake Time")
 	tbl.WithHeaderFormatter(headerFmt).WithFirstColumnFormatter(columnFmt)
 
 	for _, testName := range order {
