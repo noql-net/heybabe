@@ -109,8 +109,8 @@ func runTests(ctx context.Context, l *slog.Logger, to TestOptions) error {
 }
 
 func printTable(results map[string][]TestResult, order []string) {
-	headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
-	columnFmt := color.New(color.FgYellow).SprintfFunc()
+	headerFmt := color.New(color.FgHiMagenta, color.Bold, color.Underline).SprintfFunc()
+	columnFmt := color.New(color.FgHiCyan, color.Bold).SprintfFunc()
 
 	tbl := table.New("Test Method", "SNI", "IP:Port", "Handshake Status", "Transport Time", "TLS Handshake Time")
 	tbl.WithHeaderFormatter(headerFmt).WithFirstColumnFormatter(columnFmt)
@@ -149,13 +149,20 @@ func printTable(results map[string][]TestResult, order []string) {
 				avgTLS = totalTLS / time.Duration(successCount)
 			}
 
+			formatDur := func(d time.Duration) string {
+				if d == 0 {
+					return "0 ms"
+				}
+				return fmt.Sprintf("%.1f ms", float64(d)/float64(time.Millisecond))
+			}
+
 			tbl.AddRow(
 				testName,
 				testResult.SNI,
 				testResult.AddrPort,
 				status,
-				avgTransport,
-				avgTLS,
+				formatDur(avgTransport),
+				formatDur(avgTLS),
 			)
 		}
 	}
