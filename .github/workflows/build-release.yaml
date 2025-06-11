@@ -57,7 +57,7 @@ jobs:
 
       - name: Build heybabe
         run: |
-          go build -v -o heybabe_${{ env.ASSET_NAME }}/ -trimpath -ldflags "-s -w -buildid= -X main.version=${{ github.ref }}" .
+          go build -v -o heybabe_${{ env.ASSET_NAME }}/ -trimpath -ldflags "-s -w -buildid= -checklinkname=0 -X main.version=${{ github.ref }}" .
 
       - name: Upload heybabe binary to Artifacts
         uses: actions/upload-artifact@v4
