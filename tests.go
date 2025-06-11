@@ -8,7 +8,6 @@ import (
 	"net/netip"
 	"reflect"
 	"runtime"
-	"sort"
 	"strings"
 	"time"
 
@@ -39,13 +38,20 @@ type TestAttemptResult struct {
 
 type testFunc func(context.Context, *slog.Logger, netip.AddrPort, string) TestAttemptResult
 
-var testList map[string]testFunc = map[string]testFunc{
-	GetFunctionName(test_TCP_TLS12_Default):                         test_TCP_TLS12_Default,
-	GetFunctionName(test_TCP_TLS13_Default):                         test_TCP_TLS13_Default,
-	GetFunctionName(test_TCP_TLS_warp_plus_custom):                  test_TCP_TLS_warp_plus_custom,
-	GetFunctionName(test_TCP_TLS13_UTLS_ChromeAuto_Default):         test_TCP_TLS13_UTLS_ChromeAuto_Default,
-	GetFunctionName(test_TCP_TLS13_UTLS_ChromeAuto_bepass_fragment): test_TCP_TLS13_UTLS_ChromeAuto_bepass_fragment,
-	GetFunctionName(test_QUIC_TLS13_UQUIC_Chrome_115_Default):       test_QUIC_TLS13_UQUIC_Chrome_115_Default,
+// testCase represents a single test function and its human-readable label.
+type testCase struct {
+	fn    testFunc
+	label string
+}
+
+// testSuite holds all tests in the exact order we want to execute and display.
+var testSuite = []testCase{
+	{fn: test_TCP_TLS12_Default, label: "Default - TCP - TLS 1.2"},
+	{fn: test_TCP_TLS13_Default, label: "Default - TCP - TLS 1.3"},
+	{fn: test_TCP_TLS13_UTLS_ChromeAuto_Default, label: "Default - TCP - TLS 1.3 - uTLS ChromeAuto"},
+	{fn: test_QUIC_TLS13_UQUIC_Chrome_115_Default, label: "Default - QUIC - TLS 1.3 - uQUIC Chrome"},
+	{fn: test_TCP_TLS13_UTLS_ChromeAuto_bepass_fragment, label: "Bepass Fragment - TCP - TLS 1.3 - uTLS ChromeAuto"},
+	{fn: test_TCP_TLS_warp_plus_custom, label: "WarpPlus Custom - TCP - TLS 1.2"},
 }
 
 func runTests(ctx context.Context, l *slog.Logger, to TestOptions) error {
@@ -75,7 +81,10 @@ func runTests(ctx context.Context, l *slog.Logger, to TestOptions) error {
 	}
 
 	results := make(map[string][]TestResult)
-	for name, test := range testList {
+	labelOrder := make([]string, 0, len(testSuite))
+
+	for _, tc := range testSuite {
+		test := tc.fn
 		resultsPerTest := make([]TestResult, len(testAddrPorts))
 		for x, addrPort := range testAddrPorts {
 			tr := TestResult{AddrPort: addrPort, SNI: to.SNI, Attempts: make([]TestAttemptResult, to.Repeat)}
@@ -88,30 +97,25 @@ func runTests(ctx context.Context, l *slog.Logger, to TestOptions) error {
 			}
 			resultsPerTest[x] = tr
 		}
-		results[name] = resultsPerTest
+		results[tc.label] = resultsPerTest
+		labelOrder = append(labelOrder, tc.label)
 		// 2-second delay between different test types
 		time.Sleep(2 * time.Second)
 	}
 
-	printTable(results)
+	printTable(results, labelOrder)
 
 	return nil
 }
 
-func printTable(results map[string][]TestResult) {
+func printTable(results map[string][]TestResult, order []string) {
 	headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
 	columnFmt := color.New(color.FgYellow).SprintfFunc()
 
 	tbl := table.New("Test", "SNI", "AddressPort", "Success", "TransportEstablishTime", "TLSHandshakeTime")
 	tbl.WithHeaderFormatter(headerFmt).WithFirstColumnFormatter(columnFmt)
 
-	keys := make([]string, 0, len(results))
-	for k := range results {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, testName := range keys {
+	for _, testName := range order {
 		testResults := results[testName]
 		for _, testResult := range testResults {
 			for i, attempt := range testResult.Attempts {
@@ -124,11 +128,12 @@ func printTable(results map[string][]TestResult) {
 					attempt.TLSHandshakeDuration,
 				)
 			}
-			tbl.AddRow()
 		}
 	}
 
+	fmt.Println("")
 	tbl.Print()
+	fmt.Println("")
 }
 
 func resolve(ctx context.Context, hostname string, getv4, getv6 bool) (v4, v6 netip.Addr, err error) {
