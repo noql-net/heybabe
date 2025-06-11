@@ -18,7 +18,7 @@ import (
 const appName = "heybabe"
 
 var (
-	version   = ""
+	version   = "v0.0.1"
 	logLevels = []string{
 		slog.LevelDebug.String(),
 		slog.LevelInfo.String(),
