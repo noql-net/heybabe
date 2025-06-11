@@ -5,9 +5,45 @@ on:
   push:
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Checkout codebase
+        uses: actions/checkout@v4
+
+      - name: Extract version from main.go
+        id: get_version
+        run: |
+          set -e
+          VERSION=$(grep -Eo 'version[[:space:]]*=[[:space:]]*"[^"]+"' main.go | head -n1 | sed -E 's/.*"([^"]+)"/\1/')
+          if [ -z "$VERSION" ]; then
+            echo "::error::Failed to detect version constant in source code"
+            exit 1
+          fi
+          echo "Detected version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create git tag if needed
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.name "github-actions"
+          git config --local user.email "github-actions@users.noreply.github.com"
+          git fetch --tags --quiet
+          if git rev-parse "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+            echo "Tag v${VERSION} already exists"
+          else
+            git tag -a "v${VERSION}" -m "v${VERSION}"
+            git push origin "v${VERSION}"
+          fi
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+
   build:
+    needs: version
     permissions:
-      contents: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -40,42 +76,12 @@ jobs:
       GOARM: ${{ matrix.goarm }}
       CGO_ENABLED: 0
     steps:
-      - name: Checkout codebase
-        uses: actions/checkout@v4
-
       - name: Show workflow information
         run: |
           export _NAME=$GOOS-$GOARCH$GOARM$GOMIPS
           echo "GOOS: $GOOS, GOARCH: $GOARCH, GOARM: $GOARM, GOMIPS: $GOMIPS, RELEASE_NAME: $_NAME"
           echo "ASSET_NAME=$_NAME" >> $GITHUB_ENV
           echo "REF=${GITHUB_SHA::6}" >> $GITHUB_ENV
-
-      - name: Extract version from main.go
-        id: version
-        run: |
-          set -e
-          VERSION=$(grep -Eo 'version[[:space:]]*=[[:space:]]*"[^"]+"' main.go | head -n1 | sed -E 's/.*"([^"]+)"/\1/')
-          if [ -z "$VERSION" ]; then
-            echo "::error::Failed to detect version constant in source code"
-            exit 1
-          fi
-          echo "Detected version: $VERSION"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          # expose as step output
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Create git tag if needed
-        if: github.ref == 'refs/heads/main'
-        run: |
-          git config --local user.name "github-actions"
-          git config --local user.email "github-actions@users.noreply.github.com"
-          git fetch --tags --quiet
-          if git rev-parse "refs/tags/v${VERSION}" >/dev/null 2>&1; then
-            echo "Tag v${VERSION} already exists"
-          else
-            git tag -a "v${VERSION}" -m "v${VERSION}"
-            git push origin "v${VERSION}"
-          fi
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -86,7 +92,7 @@ jobs:
 
       - name: Build heybabe
         run: |
-          go build -v -o bin/heybabe_${{ env.ASSET_NAME }} -trimpath -ldflags "-s -w -buildid= -X main.version=${VERSION}" .
+          go build -v -o bin/heybabe_${{ env.ASSET_NAME }} -trimpath -ldflags "-s -w -buildid= -X main.version=${{ needs.version.outputs.version }}" .
 
       - name: Upload files to Artifacts
         uses: actions/upload-artifact@v4
@@ -94,12 +100,9 @@ jobs:
           name: heybabe_${{ env.ASSET_NAME }}_${{ env.REF }}
           path: ./bin/heybabe_${{ env.ASSET_NAME }}
 
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-
   release:
     name: Publish Release
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -112,8 +115,8 @@ jobs:
       - name: Create / Update GitHub Release and upload binaries
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.build.outputs.version }}
-          name: v${{ needs.build.outputs.version }}
+          tag_name: v${{ needs.version.outputs.version }}
+          name: v${{ needs.version.outputs.version }}
           draft: false
           prerelease: false
           files: |
