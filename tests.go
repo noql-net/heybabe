@@ -109,8 +109,8 @@ func runTests(ctx context.Context, l *slog.Logger, to TestOptions) error {
 }
 
 func printTable(results map[string][]TestResult, order []string) {
-	headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
-	columnFmt := color.New(color.FgYellow).SprintfFunc()
+	headerFmt := color.New(color.FgHiMagenta, color.Bold, color.Underline).SprintfFunc()
+	columnFmt := color.New(color.FgHiCyan, color.Bold).SprintfFunc()
 
 	tbl := table.New("Test Method", "SNI", "IP:Port", "Handshake Status", "Transport Time", "TLS Handshake Time")
 	tbl.WithHeaderFormatter(headerFmt).WithFirstColumnFormatter(columnFmt)
@@ -118,16 +118,52 @@ func printTable(results map[string][]TestResult, order []string) {
 	for _, testName := range order {
 		testResults := results[testName]
 		for _, testResult := range testResults {
-			for i, attempt := range testResult.Attempts {
-				tbl.AddRow(
-					fmt.Sprintf("%s - %d", testName, i+1),
-					testResult.SNI,
-					testResult.AddrPort,
-					attempt.err == nil,
-					attempt.TransportEstablishDuration,
-					attempt.TLSHandshakeDuration,
-				)
+			var (
+				successCount   int
+				totalTransport time.Duration
+				totalTLS       time.Duration
+			)
+
+			for _, attempt := range testResult.Attempts {
+				if attempt.err == nil {
+					successCount++
+					totalTransport += attempt.TransportEstablishDuration
+					totalTLS += attempt.TLSHandshakeDuration
+				}
 			}
+
+			totalAttempts := len(testResult.Attempts)
+			var status string
+			switch {
+			case successCount == 0:
+				status = fmt.Sprintf("Failed  (%d/%d)", successCount, totalAttempts)
+			case successCount == totalAttempts:
+				status = fmt.Sprintf("Success (%d/%d)", successCount, totalAttempts)
+			default:
+				status = fmt.Sprintf("Partial (%d/%d)", successCount, totalAttempts)
+			}
+
+			var avgTransport, avgTLS time.Duration
+			if successCount > 0 {
+				avgTransport = totalTransport / time.Duration(successCount)
+				avgTLS = totalTLS / time.Duration(successCount)
+			}
+
+			formatDur := func(d time.Duration) string {
+				if d == 0 {
+					return "0 ms"
+				}
+				return fmt.Sprintf("%.1f ms", float64(d)/float64(time.Millisecond))
+			}
+
+			tbl.AddRow(
+				testName,
+				testResult.SNI,
+				testResult.AddrPort,
+				status,
+				formatDur(avgTransport),
+				formatDur(avgTLS),
+			)
 		}
 	}
 
