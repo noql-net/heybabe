@@ -84,11 +84,13 @@ func runTests(ctx context.Context, l *slog.Logger, to TestOptions) error {
 				testCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 				tr.Attempts[i] = test(testCtx, l, addrPort, to.SNI)
 				cancel() // Always cancel to release resources
-				time.Sleep(1 * time.Second)
+				time.Sleep(2 * time.Second)
 			}
 			resultsPerTest[x] = tr
 		}
 		results[name] = resultsPerTest
+		// 2-second delay between different test types
+		time.Sleep(2 * time.Second)
 	}
 
 	printTable(results)
