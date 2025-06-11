@@ -67,7 +67,8 @@ jobs:
         run: |
           git config --local user.name "github-actions"
           git config --local user.email "github-actions@users.noreply.github.com"
-          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+          git fetch --tags --quiet
+          if git rev-parse "refs/tags/v${VERSION}" >/dev/null 2>&1; then
             echo "Tag v${VERSION} already exists"
           else
             git tag -a "v${VERSION}" -m "v${VERSION}"
