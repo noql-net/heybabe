@@ -76,6 +76,9 @@ jobs:
       GOARM: ${{ matrix.goarm }}
       CGO_ENABLED: 0
     steps:
+      - name: Checkout codebase
+        uses: actions/checkout@v4
+
       - name: Show workflow information
         run: |
           export _NAME=$GOOS-$GOARCH$GOARM$GOMIPS
