@@ -105,6 +105,7 @@ jobs:
 
   release:
     name: Publish Release
+    if: github.ref == 'refs/heads/main'
     needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
@@ -114,6 +115,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ./dist
+          merge-multiple: true
 
       - name: Create / Update GitHub Release and upload binaries
         uses: softprops/action-gh-release@v2
