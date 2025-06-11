@@ -61,6 +61,8 @@ jobs:
           fi
           echo "Detected version: $VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          # expose as step output
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Create git tag if needed
         if: github.ref == 'refs/heads/main'
@@ -80,6 +82,7 @@ jobs:
         with:
           go-version: '1.24'
           check-latest: true
+          cache: false
 
       - name: Build heybabe
         run: |
@@ -90,4 +93,31 @@ jobs:
         with:
           name: heybabe_${{ env.ASSET_NAME }}_${{ env.REF }}
           path: ./bin/heybabe_${{ env.ASSET_NAME }}
+
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./dist
+
+      - name: Create / Update GitHub Release and upload binaries
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.build.outputs.version }}
+          name: v${{ needs.build.outputs.version }}
+          draft: false
+          prerelease: false
+          files: |
+            dist/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
