@@ -2,7 +2,15 @@
 
 TLS ClientHello testing tool
 
-## Basics
+## How-To
+
+You can build this project using this command:
+
+```bash
+make build
+```
+
+### Basics
 
 ```sh
 heybabe --sni twitter.com
