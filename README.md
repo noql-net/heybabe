@@ -5,26 +5,30 @@ TLS ClientHello testing tool
 ## Basics
 
 ```sh
-$ heybabe --sni twitter.com
+heybabe --sni twitter.com
 ```
 
 To manually provide an IP address and avoid DNS lookup:
+
 ```sh
-$ heybabe --sni twitter.com --ip 1.2.3.4
+heybabe --sni twitter.com --ip 1.2.3.4
 ```
 
 To specify a non-default port:
+
 ```sh
-$ heybabe --sni twitter.com --port 8443
+heybabe --sni twitter.com --port 8443
 ```
 
 To repeat a test multiple times:
+
 ```sh
-$ heybabe --sni twitter.com --repeat 2
+heybabe --sni twitter.com --repeat 2
 ```
 
 ### Usage
-```
+
+```none
 NAME
   heybabe
 
