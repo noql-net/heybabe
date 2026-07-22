@@ -17,7 +17,7 @@ import (
 )
 
 // test_QUIC_TLS13_UQUIC_Chrome_115_Default
-func test_QUIC_TLS13_UQUIC_Chrome_115_Default(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string) TestAttemptResult {
+func test_QUIC_TLS13_UQUIC_Chrome_115_Default(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string, host string) TestAttemptResult {
 	counter, _, _, _ := runtime.Caller(0)
 	l = l.With("test", strings.Split(runtime.FuncForPC(counter).Name(), ".")[1], "ip", addrPort.Addr().String())
 
@@ -64,6 +64,8 @@ func test_QUIC_TLS13_UQUIC_Chrome_115_Default(ctx context.Context, l *slog.Logge
 	defer quicConn.CloseWithError(quic.ApplicationErrorCode(quic.NoError), "")
 	res.TransportEstablishDuration = time.Since(t0)
 
-	l.Info("success", "handshake", quicConn.ConnectionState().TLS.HandshakeComplete)
+	l.Info("handshake success", "handshake", quicConn.ConnectionState().TLS.HandshakeComplete)
+	l.Warn("TTFB test not yet implemented for QUIC")
+
 	return res
 }

@@ -21,7 +21,7 @@ import (
 // forced TLS1.3
 // default elliptic curve preferences
 // utls.HelloChrome_Auto
-func test_TCP_TLS13_UTLS_ChromeAuto_Default(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string) TestAttemptResult {
+func test_TCP_TLS13_UTLS_ChromeAuto_Default(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string, host string) TestAttemptResult {
 	counter, _, _, _ := runtime.Caller(0)
 	l = l.With("test", strings.Split(runtime.FuncForPC(counter).Name(), ".")[1], "ip", addrPort.Addr().String())
 
@@ -69,6 +69,14 @@ func test_TCP_TLS13_UTLS_ChromeAuto_Default(ctx context.Context, l *slog.Logger,
 	res.TLSHandshakeDuration = time.Since(t0)
 
 	tlsState := tlsConn.ConnectionState()
-	l.Info("success", "handshake", tlsState.HandshakeComplete)
+	l.Info("handshake success", "handshake", tlsState.HandshakeComplete)
+
+	ttfb, err := measureTTFB(ctx, tlsConn, host)
+	if err != nil {
+		res.err = err
+		l.Error(err.Error())
+	}
+	res.TTFBDuration = ttfb
+
 	return res
 }

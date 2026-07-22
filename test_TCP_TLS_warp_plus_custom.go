@@ -19,7 +19,7 @@ import (
 // test_TCP_TLS_warp_plus_custom is a uTLS connection using:
 // warp-plus settings from from warp-plus v1.2.1
 // NOTE: the version of uTLS used in warp-plus is much older than here.
-func test_TCP_TLS_warp_plus_custom(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string) TestAttemptResult {
+func test_TCP_TLS_warp_plus_custom(ctx context.Context, l *slog.Logger, addrPort netip.AddrPort, sni string, host string) TestAttemptResult {
 	counter, _, _, _ := runtime.Caller(0)
 	l = l.With("test", strings.Split(runtime.FuncForPC(counter).Name(), ".")[1], "ip", addrPort.Addr().String())
 
@@ -120,7 +120,15 @@ func test_TCP_TLS_warp_plus_custom(ctx context.Context, l *slog.Logger, addrPort
 	res.TLSHandshakeDuration = time.Since(t0)
 
 	tlsState := tlsConn.ConnectionState()
-	l.Info("success", "handshake", tlsState.HandshakeComplete)
+	l.Info("handshake success", "handshake", tlsState.HandshakeComplete)
+
+	ttfb, err := measureTTFB(ctx, tlsConn, host)
+	if err != nil {
+		res.err = err
+		l.Error(err.Error())
+	}
+	res.TTFBDuration = ttfb
+
 	return res
 }
 

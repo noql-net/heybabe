@@ -33,6 +33,7 @@ func main() {
 		v4       = fs.BoolShort('4', "only resolve IPv4 (only works when IP is not set)")
 		v6       = fs.BoolShort('6', "only resolve IPv6 (only works when IP is not set)")
 		sni      = fs.StringLong("sni", "", "tls sni (if IP flag not provided, this SNI will be resolved by system DNS)")
+		host     = fs.StringLong("host", "", "http host (defaults to sni)")
 		port     = fs.UintLong("port", 443, "tls port")
 		ip       = fs.StringLong("ip", "", "manually provide IP (no DNS lookup)")
 		repeat   = fs.UintLong("repeat", 1, "number of times to repeat each test")
@@ -88,6 +89,9 @@ func main() {
 	if *sni == "" {
 		fatal(l, errors.New("must specify SNI"))
 	}
+	if *host == "" {
+		*host = *sni
+	}
 
 	addr := netip.IPv4Unspecified()
 	if *ip != "" {
@@ -114,6 +118,7 @@ func main() {
 			ManualIP:    addr.Unmap(),
 			Port:        uint16(*port),
 			SNI:         *sni,
+			Host:        *host,
 			Repeat:      *repeat,
 		}
 

@@ -21,6 +21,7 @@ type TestOptions struct {
 	ManualIP    netip.Addr
 	Port        uint16
 	SNI         string
+	Host        string
 	Repeat      uint
 }
 
@@ -33,10 +34,12 @@ type TestResult struct {
 type TestAttemptResult struct {
 	TransportEstablishDuration time.Duration
 	TLSHandshakeDuration       time.Duration
+	TTFBDuration               time.Duration
+	Conn                       net.Conn
 	err                        error
 }
 
-type testFunc func(context.Context, *slog.Logger, netip.AddrPort, string) TestAttemptResult
+type testFunc func(context.Context, *slog.Logger, netip.AddrPort, string, string) TestAttemptResult
 
 // Represents a single test function and its label.
 type testCase struct {
@@ -91,7 +94,7 @@ func runTests(ctx context.Context, l *slog.Logger, to TestOptions) error {
 			for i := uint(0); i < to.Repeat; i++ {
 				// Create a context with 10-second timeout for each individual test
 				testCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-				tr.Attempts[i] = test(testCtx, l, addrPort, to.SNI)
+				tr.Attempts[i] = test(testCtx, l, addrPort, to.SNI, to.Host)
 				cancel() // Always cancel to release resources
 				time.Sleep(2 * time.Second)
 			}
@@ -112,7 +115,7 @@ func printTable(results map[string][]TestResult, order []string) {
 	headerFmt := color.New(color.FgHiMagenta, color.Bold, color.Underline).SprintfFunc()
 	columnFmt := color.New(color.FgHiCyan, color.Bold).SprintfFunc()
 
-	tbl := table.New("Test Method", "SNI", "IP:Port", "Handshake Status", "Transport Time", "TLS Handshake Time")
+	tbl := table.New("Method", "SNI", "IP:Port", "Handshake", "Transport", "TLS Handshake", "TTFB")
 	tbl.WithHeaderFormatter(headerFmt).WithFirstColumnFormatter(columnFmt)
 
 	for _, testName := range order {
@@ -122,6 +125,7 @@ func printTable(results map[string][]TestResult, order []string) {
 				successCount   int
 				totalTransport time.Duration
 				totalTLS       time.Duration
+				totalTTFB      time.Duration
 			)
 
 			for _, attempt := range testResult.Attempts {
@@ -129,6 +133,7 @@ func printTable(results map[string][]TestResult, order []string) {
 					successCount++
 					totalTransport += attempt.TransportEstablishDuration
 					totalTLS += attempt.TLSHandshakeDuration
+					totalTTFB += attempt.TTFBDuration
 				}
 			}
 
@@ -143,10 +148,11 @@ func printTable(results map[string][]TestResult, order []string) {
 				status = fmt.Sprintf("Partial (%d/%d)", successCount, totalAttempts)
 			}
 
-			var avgTransport, avgTLS time.Duration
+			var avgTransport, avgTLS, avgTTFB time.Duration
 			if successCount > 0 {
 				avgTransport = totalTransport / time.Duration(successCount)
 				avgTLS = totalTLS / time.Duration(successCount)
+				avgTTFB = totalTTFB / time.Duration(successCount)
 			}
 
 			formatDur := func(d time.Duration) string {
@@ -163,6 +169,7 @@ func printTable(results map[string][]TestResult, order []string) {
 				status,
 				formatDur(avgTransport),
 				formatDur(avgTLS),
+				formatDur(avgTTFB),
 			)
 		}
 	}
